@@ -37,6 +37,23 @@ For CLI mode:
 
 The executable is created at `dist\NetEasePlaylistBackup.exe`. `START_APP.cmd` starts the local API and the desktop app.
 
+## Publish to GitHub
+
+Install and sign in to GitHub CLI once:
+
+```powershell
+winget install --id GitHub.cli --exact
+gh auth login
+```
+
+Then publish the public repository and Windows release (replace `YOUR_NAME/YOUR_REPO`):
+
+```powershell
+.\publish_github.ps1 -Repository "YOUR_NAME/YOUR_REPO"
+```
+
+Use `-CreatePrivate` for a private repository. The script pushes the `main` branch and uploads `NetEasePlaylistBackup-v1.0.0-windows.zip` as a GitHub Release asset.
+
 ## License
 
 MIT. The project depends on the separately licensed `NeteaseCloudMusicApi` package and ffmpeg. Review their licenses before redistribution.

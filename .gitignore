@@ -13,4 +13,7 @@ outputs/
 api-host/node_modules/
 api-host/package-lock.json
 .pytest_cache/
-
+release-staging/
+package-lock.json
+root-build.log
+*.zip

@@ -1,0 +1,7 @@
+{
+  "name": "netease-playlist-backup-api-host",
+  "private": true,
+  "dependencies": {
+    "NeteaseCloudMusicApi": "4.32.0"
+  }
+}

@@ -146,11 +146,11 @@ def ffmpeg_convert(source: Path, target: Path, title: str, artist: str,
     cmd += ["-c:a", "libmp3lame", "-b:a", bitrate, "-ar", "44100", "-ac", "2",
             "-id3v2_version", "3", "-metadata", f"title={title}",
             "-metadata", f"artist={artist}", "-metadata", f"album={album}", str(target)]
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, timeout=300)
 
 
 def download(url: str, destination: Path, session: requests.Session) -> None:
-    with session.get(url, stream=True, timeout=60) as response:
+    with session.get(url, stream=True, timeout=(15, 60)) as response:
         response.raise_for_status()
         with destination.open("wb") as handle:
             for chunk in response.iter_content(chunk_size=1024 * 256):

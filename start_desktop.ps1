@@ -1,9 +1,13 @@
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
-$appPath = Join-Path $PSScriptRoot "dist\NetEasePlaylistBackup.exe"
+$appCandidates = @(
+  (Join-Path $PSScriptRoot "NetEasePlaylistBackup.exe"),
+  (Join-Path $PSScriptRoot "dist\NetEasePlaylistBackup.exe")
+)
+$appPath = $appCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 $apiScript = Join-Path $PSScriptRoot "start_api.ps1"
 if (-not (Test-Path -LiteralPath $appPath)) {
-  throw "Desktop application was not found: $appPath"
+  throw "Desktop application was not found. Put NetEasePlaylistBackup.exe beside START_APP.cmd or under dist\"
 }
 $api = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue
 if (-not $api) {

@@ -51,18 +51,36 @@ def clean_name(value: str, fallback: str = "未知") -> str:
     return (value or fallback)[:180]
 
 
+SOURCE_LEVELS = (
+    ("standard", "标准 MP3 128k"),
+    ("higher", "较高 MP3 192k"),
+    ("exhigh", "极高 MP3 320k"),
+    ("lossless", "无损 FLAC"),
+    ("hires", "Hi-Res 无损"),
+    ("jyeffect", "高清环绕"),
+    ("sky", "沉浸环绕"),
+    ("dolby", "杜比全景声"),
+    ("jymaster", "超清母带"),
+)
+OUTPUT_BITRATES = ("32k", "40k", "48k", "56k", "64k", "80k", "96k", "112k", "128k",
+                   "160k", "192k", "224k", "256k", "320k")
+
+
 def playlist_id(value: str) -> str:
+    """Extract an id only from an explicit playlist URL; never accept song URLs/IDs."""
     value = value.strip()
-    if value.isdigit():
-        return value
     parsed = urlparse(value)
-    query_id = parse_qs(parsed.query).get("id", [None])[0]
+    query = parse_qs(parsed.query)
+    if not query and parsed.fragment:
+        query = parse_qs(parsed.fragment.split("?", 1)[-1])
+    if parsed.netloc and parsed.netloc not in ("music.163.com", "www.music.163.com"):
+        raise ValueError("只支持网易云歌单链接")
+    if "/playlist" not in parsed.path and "#/playlist" not in value:
+        raise ValueError("只支持歌单链接，不能下载单曲；请粘贴 https://music.163.com/playlist?id=...")
+    query_id = query.get("id", [None])[0]
     if query_id and query_id.isdigit():
         return query_id
-    match = re.search(r"(?:playlist|id)[^0-9]*(\d{4,})", value)
-    if match:
-        return match.group(1)
-    raise ValueError("无法从输入中找到歌单 ID")
+    raise ValueError("歌单链接缺少有效的 id 参数")
 
 
 class NeteaseAPI:
@@ -98,9 +116,10 @@ class NeteaseAPI:
         return rows[0].get("url") if rows else None
 
     def best_url(self, song_id: int, preferred: str) -> str | None:
-        # Standard/higher are normally MP3; lossless is the fallback source.
-        levels = [preferred] if preferred == "lossless" else []
-        for level in ("standard", "higher", "exhigh", "lossless"):
+        # Try the requested NetEase quality first, then degrade to playable levels.
+        levels = [preferred]
+        for level in ("jymaster", "hires", "lossless", "dolby", "sky", "jyeffect",
+                      "exhigh", "higher", "standard"):
             if level not in levels:
                 levels.append(level)
         for level in levels:
@@ -207,7 +226,7 @@ def gui(defaults: argparse.Namespace) -> int:
     from tkinter import filedialog, messagebox, ttk
     import threading
     root = tk.Tk(); root.title("网易云歌单 MP3 备份"); root.resizable(False, False)
-    root.geometry("650x365")
+    root.geometry("700x430")
     defaults.cookie = load_cookie()
     fields: dict[str, tk.StringVar] = {}
     for row, (label, key, value) in enumerate((("歌单链接", "playlist", defaults.playlist or ""), ("API 地址", "api", defaults.api), ("输出目录", "output", defaults.output))):
@@ -215,12 +234,19 @@ def gui(defaults: argparse.Namespace) -> int:
         var = tk.StringVar(value=value); fields[key] = var
         ttk.Entry(root, textvariable=var, width=58).grid(row=row, column=1, padx=8, pady=9, columnspan=2, sticky="ew")
     ttk.Label(root, text="码率").grid(row=3, column=0, padx=12, pady=9, sticky="w")
+    ttk.Label(root, text="网易云音质").grid(row=3, column=0, padx=12, pady=9, sticky="w")
+    level = tk.StringVar(value=defaults.level)
+    level_values = [f"{key} | {label}" for key, label in SOURCE_LEVELS]
+    level_box = ttk.Combobox(root, textvariable=level, values=level_values, state="readonly", width=28)
+    level_box.grid(row=3, column=1, padx=8, pady=9, sticky="w")
+    level.set(next((x for x in level_values if x.startswith(defaults.level + " |")), level_values[2]))
+    ttk.Label(root, text="输出 MP3 码率").grid(row=4, column=0, padx=12, pady=9, sticky="w")
     bitrate = tk.StringVar(value=defaults.bitrate)
-    ttk.Combobox(root, textvariable=bitrate, values=("128k", "96k"), state="readonly", width=10).grid(row=3, column=1, padx=8, pady=9, sticky="w")
+    ttk.Combobox(root, textvariable=bitrate, values=OUTPUT_BITRATES, state="readonly", width=10).grid(row=4, column=1, padx=8, pady=9, sticky="w")
     login_status = tk.StringVar(value="已保存登录状态" if defaults.cookie else "未登录：只能获取公开可播放音源")
     status = tk.StringVar(value="就绪")
-    ttk.Label(root, textvariable=login_status, foreground="#555").grid(row=4, column=0, columnspan=3, padx=12, pady=5, sticky="w")
-    ttk.Label(root, textvariable=status, foreground="#555").grid(row=5, column=0, columnspan=3, padx=12, pady=5, sticky="w")
+    ttk.Label(root, textvariable=login_status, foreground="#555").grid(row=5, column=0, columnspan=3, padx=12, pady=5, sticky="w")
+    ttk.Label(root, textvariable=status, foreground="#555").grid(row=6, column=0, columnspan=3, padx=12, pady=5, sticky="w")
     choose_button = ttk.Button(root, text="选择目录", command=lambda: fields["output"].set(filedialog.askdirectory() or fields["output"].get()))
     choose_button.grid(row=2, column=3, padx=8)
     def qr_login():
@@ -263,10 +289,10 @@ def gui(defaults: argparse.Namespace) -> int:
         threading.Thread(target=worker, daemon=True).start()
     ttk.Button(root, text="扫码登录", command=qr_login).grid(row=4, column=3, padx=8)
     start_button = ttk.Button(root, text="开始备份")
-    start_button.grid(row=6, column=1, pady=14, sticky="w")
+    start_button.grid(row=7, column=1, pady=14, sticky="w")
     def run():
         for key, var in fields.items(): setattr(defaults, key, var.get())
-        defaults.bitrate = bitrate.get(); defaults.gui = False
+        defaults.bitrate = bitrate.get(); defaults.level = level.get().split(" |", 1)[0]; defaults.gui = False
         code = process(defaults)
         root.after(0, finished, code)
     def finished(code: int):
@@ -285,11 +311,11 @@ def gui(defaults: argparse.Namespace) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="网易云歌单个人本地 MP3 备份与转码")
-    parser.add_argument("playlist", nargs="?", help="歌单链接或 ID")
+    parser.add_argument("playlist", nargs="?", help="网易云歌单 URL（不接受单曲链接或纯数字 ID）")
     parser.add_argument("-o", "--output", default="./music-backup")
     parser.add_argument("--api", default="http://127.0.0.1:3000")
-    parser.add_argument("--level", default="exhigh", choices=("standard", "higher", "exhigh", "lossless"))
-    parser.add_argument("--bitrate", default="128k", choices=("128k", "96k"))
+    parser.add_argument("--level", default="exhigh", choices=tuple(x[0] for x in SOURCE_LEVELS))
+    parser.add_argument("--bitrate", default="128k", choices=OUTPUT_BITRATES)
     parser.add_argument("--ffmpeg", default="ffmpeg")
     parser.add_argument("--gui", action="store_true")
     args = parser.parse_args()

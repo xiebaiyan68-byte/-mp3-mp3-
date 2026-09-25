@@ -67,21 +67,29 @@ OUTPUT_BITRATES = ("32k", "40k", "48k", "56k", "64k", "80k", "96k", "112k", "128
                    "160k", "192k", "224k", "256k", "320k")
 
 
-def playlist_id(value: str) -> str:
-    """Extract an id only from an explicit playlist URL; never accept song URLs/IDs."""
+def media_ref(value: str) -> tuple[str, str]:
+    """Return (kind, id) for an explicit NetEase playlist or song URL."""
     value = value.strip()
     parsed = urlparse(value)
     query = parse_qs(parsed.query)
     if not query and parsed.fragment:
         query = parse_qs(parsed.fragment.split("?", 1)[-1])
     if parsed.netloc and parsed.netloc not in ("music.163.com", "www.music.163.com"):
-        raise ValueError("只支持网易云歌单链接")
-    if "/playlist" not in parsed.path and "#/playlist" not in value:
-        raise ValueError("只支持歌单链接，不能下载单曲；请粘贴 https://music.163.com/playlist?id=...")
+        raise ValueError("只支持网易云音乐歌单或单曲链接")
+    kind = "playlist" if "/playlist" in parsed.path else "song" if "/song" in parsed.path else ""
+    if not kind:
+        raise ValueError("请粘贴 https://music.163.com/playlist?id=... 或 /song?id=... 链接")
     query_id = query.get("id", [None])[0]
     if query_id and query_id.isdigit():
-        return query_id
-    raise ValueError("歌单链接缺少有效的 id 参数")
+        return kind, query_id
+    raise ValueError("链接缺少有效的 id 参数")
+
+
+def playlist_id(value: str) -> str:
+    kind, ident = media_ref(value)
+    if kind != "playlist":
+        raise ValueError("当前输入是单曲链接，请使用单曲解析模式")
+    return ident
 
 
 class NeteaseAPI:
@@ -110,6 +118,10 @@ class NeteaseAPI:
             detail = self.get("/song/detail", ids=ids)
             tracks = detail.get("songs") or tracks
         return tracks
+
+    def song(self, song_id: str) -> list[dict[str, Any]]:
+        data = self.get("/song/detail", ids=song_id)
+        return data.get("songs") or []
 
     def url(self, song_id: int, level: str) -> str | None:
         data = self.get("/song/url/v1", id=song_id, level=level)
@@ -171,7 +183,7 @@ def process(args: argparse.Namespace, progress=None) -> int:
     if not shutil.which(args.ffmpeg):
         logging.error("找不到 ffmpeg，请安装并加入 PATH，或用 --ffmpeg 指定路径")
         return 2
-    pid = playlist_id(args.playlist)
+    kind, media_id = media_ref(args.playlist)
     session = requests.Session()
     session.mount("http://", HTTPAdapter(max_retries=Retry(
         total=3, connect=3, read=3, status=3,
@@ -180,14 +192,14 @@ def process(args: argparse.Namespace, progress=None) -> int:
     )))
     api = NeteaseAPI(args.api, session, getattr(args, "cookie", "") or load_cookie())
     try:
-        tracks = api.playlist(pid)
+        tracks = api.playlist(media_id) if kind == "playlist" else api.song(media_id)
     except Exception as exc:
         logging.error("解析歌单失败: %s", exc)
         return 1
     if not tracks:
         logging.error("歌单没有可见歌曲")
         return 1
-    logging.info("歌单 %s: %d 首歌曲", pid, len(tracks))
+    logging.info("%s %s: %d 首歌曲", "歌单" if kind == "playlist" else "单曲", media_id, len(tracks))
     if progress:
         progress(f"已解析歌单，共 {len(tracks)} 首歌曲")
     with tempfile.TemporaryDirectory(prefix="netease-backup-") as temp_dir:
@@ -239,7 +251,7 @@ def gui(defaults: argparse.Namespace) -> int:
     root.geometry("700x430")
     defaults.cookie = load_cookie()
     fields: dict[str, tk.StringVar] = {}
-    for row, (label, key, value) in enumerate((("歌单链接", "playlist", defaults.playlist or ""), ("API 地址", "api", defaults.api), ("输出目录", "output", defaults.output))):
+    for row, (label, key, value) in enumerate((("歌单/单曲链接", "playlist", defaults.playlist or ""), ("API 地址", "api", defaults.api), ("输出目录", "output", defaults.output))):
         ttk.Label(root, text=label).grid(row=row, column=0, padx=12, pady=9, sticky="w")
         var = tk.StringVar(value=value); fields[key] = var
         ttk.Entry(root, textvariable=var, width=58).grid(row=row, column=1, padx=8, pady=9, columnspan=2, sticky="ew")
@@ -325,7 +337,7 @@ def gui(defaults: argparse.Namespace) -> int:
         try:
             playlist_id(value)
         except ValueError as exc:
-            messagebox.showerror("歌单链接无效", str(exc))
+            messagebox.showerror("链接无效", str(exc))
             return
         start_button.configure(state="disabled"); choose_button.configure(state="disabled"); status.set("正在下载和转码，请稍候…")
         threading.Thread(target=run, daemon=True).start()
@@ -335,7 +347,7 @@ def gui(defaults: argparse.Namespace) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="网易云歌单个人本地 MP3 备份与转码")
-    parser.add_argument("playlist", nargs="?", help="网易云歌单 URL（不接受单曲链接或纯数字 ID）")
+    parser.add_argument("playlist", nargs="?", help="网易云歌单或单曲 URL")
     parser.add_argument("-o", "--output", default="./music-backup")
     parser.add_argument("--api", default="http://127.0.0.1:3000")
     parser.add_argument("--level", default="exhigh", choices=tuple(x[0] for x in SOURCE_LEVELS))

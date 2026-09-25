@@ -247,7 +247,7 @@ def gui(defaults: argparse.Namespace) -> int:
     import tkinter as tk
     from tkinter import filedialog, messagebox, ttk
     import threading
-    root = tk.Tk(); root.title("网易云歌单 MP3 备份"); root.resizable(False, False)
+    root = tk.Tk(); root.title("网易云音乐歌单/单曲 MP3 备份工具"); root.resizable(False, False)
     root.geometry("700x430")
     defaults.cookie = load_cookie()
     fields: dict[str, tk.StringVar] = {}
@@ -255,7 +255,6 @@ def gui(defaults: argparse.Namespace) -> int:
         ttk.Label(root, text=label).grid(row=row, column=0, padx=12, pady=9, sticky="w")
         var = tk.StringVar(value=value); fields[key] = var
         ttk.Entry(root, textvariable=var, width=58).grid(row=row, column=1, padx=8, pady=9, columnspan=2, sticky="ew")
-    ttk.Label(root, text="码率").grid(row=3, column=0, padx=12, pady=9, sticky="w")
     ttk.Label(root, text="网易云音质").grid(row=3, column=0, padx=12, pady=9, sticky="w")
     level = tk.StringVar(value=defaults.level)
     level_values = [f"{key} | {label}" for key, label in SOURCE_LEVELS]
@@ -332,7 +331,7 @@ def gui(defaults: argparse.Namespace) -> int:
     def start():
         value = fields["playlist"].get().strip()
         if not value:
-            messagebox.showwarning("缺少歌单链接", "请先粘贴网易云歌单链接")
+            messagebox.showwarning("缺少链接", "请先粘贴网易云歌单或单曲链接")
             return
         try:
             media_ref(value)

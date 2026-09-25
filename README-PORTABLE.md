@@ -1,4 +1,6 @@
-# NetEase Playlist Backup Portable
+# 网易云音乐歌单/单曲 MP3 备份工具（Windows 便携版）
+
+解压后双击 `START_APP.cmd`，无需安装 Python、Node.js 或 ffmpeg，即可把登录账号能播放的网易云歌单或单曲备份为 MP3。
 
 这是 Windows 便携版。解压后双击 `START_APP.cmd` 即可运行，不需要安装 Python、Node.js 或 ffmpeg。
 

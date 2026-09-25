@@ -1,6 +1,8 @@
-# NetEase Playlist Backup Portable
+# 网易云音乐转mp3（歌单/单曲） 可选音质（原版）和码率（常见）
 
 这是 Windows 便携版。解压后双击 `START_APP.cmd` 即可运行，不需要安装 Python、Node.js 或 ffmpeg。
+
+##
 
 ## 使用
 

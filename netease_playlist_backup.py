@@ -62,6 +62,7 @@ SOURCE_LEVELS = (
     ("dolby", "杜比全景声"),
     ("jymaster", "超清母带"),
 )
+SOURCE_ORDER = tuple(x[0] for x in SOURCE_LEVELS)
 OUTPUT_BITRATES = ("32k", "40k", "48k", "56k", "64k", "80k", "96k", "112k", "128k",
                    "160k", "192k", "224k", "256k", "320k")
 
@@ -92,7 +93,7 @@ class NeteaseAPI:
     def get(self, path: str, **params: Any) -> dict[str, Any]:
         if self.cookie:
             params.setdefault("cookie", self.cookie)
-        response = self.session.get(f"{self.base}{path}", params=params, timeout=30)
+        response = self.session.get(f"{self.base}{path}", params=params, timeout=(8, 15))
         response.raise_for_status()
         data = response.json()
         if data.get("code") not in (None, 200):
@@ -116,12 +117,13 @@ class NeteaseAPI:
         return rows[0].get("url") if rows else None
 
     def best_url(self, song_id: int, preferred: str) -> str | None:
-        # Try the requested NetEase quality first, then degrade to playable levels.
-        levels = [preferred]
-        for level in ("jymaster", "hires", "lossless", "dolby", "sky", "jyeffect",
-                      "exhigh", "higher", "standard"):
-            if level not in levels:
-                levels.append(level)
+        # Try the requested quality, then only degrade to lower levels. Never
+        # probe higher tiers after the user selected a basic quality.
+        try:
+            start = SOURCE_ORDER.index(preferred)
+        except ValueError:
+            start = SOURCE_ORDER.index("exhigh")
+        levels = [preferred] + list(reversed(SOURCE_ORDER[:start]))
         for level in levels:
             try:
                 url = self.url(song_id, level)

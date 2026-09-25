@@ -1,5 +1,10 @@
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
+$mutex = New-Object System.Threading.Mutex($false, 'NetEasePlaylistBackup.SingleInstance')
+if (-not $mutex.WaitOne(0)) {
+  Write-Host "NetEasePlaylistBackup is already starting or running."
+  exit 0
+}
 $appCandidates = @(
   (Join-Path $PSScriptRoot "NetEasePlaylistBackup.exe"),
   (Join-Path $PSScriptRoot "dist\NetEasePlaylistBackup.exe")

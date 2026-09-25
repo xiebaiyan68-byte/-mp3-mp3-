@@ -160,12 +160,14 @@ def download(url: str, destination: Path, session: requests.Session) -> None:
                     handle.write(chunk)
 
 
-def process(args: argparse.Namespace) -> int:
+def process(args: argparse.Namespace, progress=None) -> int:
     output = Path(args.output).expanduser().resolve()
     output.mkdir(parents=True, exist_ok=True)
     log_path = output / "backup.log"
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
-                        handlers=[logging.FileHandler(log_path, encoding="utf-8"), logging.StreamHandler()])
+                        handlers=[logging.FileHandler(log_path, encoding="utf-8"), logging.StreamHandler()],
+                        force=True)
+    logging.info("开始处理歌单链接: %s", args.playlist)
     if not shutil.which(args.ffmpeg):
         logging.error("找不到 ffmpeg，请安装并加入 PATH，或用 --ffmpeg 指定路径")
         return 2
@@ -186,6 +188,8 @@ def process(args: argparse.Namespace) -> int:
         logging.error("歌单没有可见歌曲")
         return 1
     logging.info("歌单 %s: %d 首歌曲", pid, len(tracks))
+    if progress:
+        progress(f"已解析歌单，共 {len(tracks)} 首歌曲")
     with tempfile.TemporaryDirectory(prefix="netease-backup-") as temp_dir:
         temp = Path(temp_dir)
         for index, song in enumerate(tracks, 1):
@@ -200,6 +204,8 @@ def process(args: argparse.Namespace) -> int:
                 logging.info("[%d/%d] 跳过已存在: %s", index, len(tracks), target.name)
                 continue
             try:
+                if progress:
+                    progress(f"[{index}/{len(tracks)}] 正在获取音源：{artist} - {title}")
                 source_url = api.best_url(int(song_id), args.level)
                 if not source_url:
                     logging.warning("[%d/%d] 无可下载音源，跳过: %s - %s", index, len(tracks), artist, title)
@@ -218,6 +224,8 @@ def process(args: argparse.Namespace) -> int:
                 download(source_url, source, session)
                 ffmpeg_convert(source, target, title, artist, album, cover, args.bitrate, args.ffmpeg)
                 logging.info("[%d/%d] 完成: %s", index, len(tracks), target.name)
+                if progress:
+                    progress(f"[{index}/{len(tracks)}] 完成：{target.name}")
             except Exception as exc:
                 logging.error("[%d/%d] 失败 %s - %s: %s", index, len(tracks), artist, title, exc)
     return 0
@@ -295,15 +303,29 @@ def gui(defaults: argparse.Namespace) -> int:
     def run():
         for key, var in fields.items(): setattr(defaults, key, var.get())
         defaults.bitrate = bitrate.get(); defaults.level = level.get().split(" |", 1)[0]; defaults.gui = False
-        code = process(defaults)
-        root.after(0, finished, code)
+        try:
+            code = process(defaults, progress=lambda text: root.after(0, status.set, text))
+            root.after(0, finished, code)
+        except Exception as exc:
+            logging.exception("任务未处理完成")
+            root.after(0, failed, str(exc))
     def finished(code: int):
         start_button.configure(state="normal"); choose_button.configure(state="normal")
         status.set("处理完成，请查看输出目录中的 backup.log" if code == 0 else "处理失败，请查看日志")
         messagebox.showinfo("网易云歌单备份", status.get())
+    def failed(message: str):
+        start_button.configure(state="normal"); choose_button.configure(state="normal")
+        status.set("处理异常，请查看 backup.log")
+        messagebox.showerror("网易云歌单备份失败", message)
     def start():
-        if not fields["playlist"].get().strip():
+        value = fields["playlist"].get().strip()
+        if not value:
             messagebox.showwarning("缺少歌单链接", "请先粘贴网易云歌单链接")
+            return
+        try:
+            playlist_id(value)
+        except ValueError as exc:
+            messagebox.showerror("歌单链接无效", str(exc))
             return
         start_button.configure(state="disabled"); choose_button.configure(state="disabled"); status.set("正在下载和转码，请稍候…")
         threading.Thread(target=run, daemon=True).start()

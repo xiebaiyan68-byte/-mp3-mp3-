@@ -335,7 +335,7 @@ def gui(defaults: argparse.Namespace) -> int:
             messagebox.showwarning("缺少歌单链接", "请先粘贴网易云歌单链接")
             return
         try:
-            playlist_id(value)
+            media_ref(value)
         except ValueError as exc:
             messagebox.showerror("链接无效", str(exc))
             return

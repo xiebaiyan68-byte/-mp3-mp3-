@@ -1,23 +1,60 @@
-[README-PORTABLE.md](https://github.com/user-attachments/files/32639043/README-PORTABLE.md)# NetEase Playlist Backup Portable
-这是 Windows 便携版。解压后双击 `START_APP.cmd` 即可运行，不需要安装 Python、Node.js 或 ffmpeg。
+# NetEase Playlist Backup
 
-## 网易云音乐歌单/单曲一键转换mp3（可以选择音质 “wyy原版音质” 和 码率：包括所有常见的码率）
+Windows desktop app and Python CLI for backing up NetEase Cloud Music playlists that the signed-in account can play, then converting them to legacy-compatible MP3 files.
 
-## 使用：
+## Features
 
-1. 解压整个目录，不要只复制 EXE。
-2. 双击 `START_APP.cmd`。
-3. 在程序中扫码登录，输入网易云歌单链接，选择输出目录和音质后开始备份。
+- Parse a playlist URL/ID or a single-song URL/ID through the open-source `NeteaseCloudMusicApi` service.
+- QR-code login support; the app sends only the account's own session cookie to the local API.
+- Prefer available MP3 sources, then fall back to lossless sources when exposed by the API.
+- Select the NetEase source quality: standard, higher, exhigh, lossless, Hi-Res, surround, Dolby, or Master when the signed-in API account exposes it.
+- Convert with ffmpeg `libmp3lame`, CBR output from 32 kbps through 320 kbps, 44.1 kHz stereo, ID3v2.3 metadata and album art.
+- Save as `Artist - Title.mp3`, skip existing files, and write `backup.log`.
 
-程序会使用本目录内的 `runtime\\node.exe`、`runtime\\ffmpeg.exe` 和 `api-host\\node_modules`。首次启动通常只需要几秒；API 窗口在后台运行。
+The project does not bypass DRM, paid access, regional restrictions, or other playback controls. It only backs up content the signed-in account can play. Playlist links and individual song links are supported; bare IDs are accepted when the input type is clear.
 
-## 说明：
+## Quick start on Windows
 
-- 仅处理登录账号能够正常播放、且用户有权进行本地备份的内容。
-- 不绕过 DRM、付费权限、地区限制或其他访问控制。
-- 输出文件默认命名为 `歌手 - 歌名.mp3`，已存在的文件会跳过。
-- 日志默认写入 `%APPDATA%\\NetEasePlaylistBackup\\backup.log`。
+Requirements: Python 3.10+, Node.js 18+, and ffmpeg in `PATH`.
 
-## 关闭：
+```powershell
+python -m pip install -r requirements.txt
+.\start_desktop.ps1
+```
 
-关闭主程序后，如仍有后台 API 进程，可在任务管理器中结束对应的 `node.exe` 进程。
+The first run installs `NeteaseCloudMusicApi` into `api-host\node_modules`. The app opens at `http://127.0.0.1:3000` locally and then shows the desktop UI. Click **扫码登录**, scan with the NetEase Cloud Music app, paste a playlist URL, choose an output folder, and start.
+
+For CLI mode:
+
+```powershell
+.\run_backup.ps1 -Playlist "https://music.163.com/playlist?id=123456789" -Output ".\music-backup"
+```
+
+## Build an exe
+
+```powershell
+.\build_windows.ps1
+```
+
+The executable is created at `dist\NetEasePlaylistBackup.exe`. `START_APP.cmd` starts the local API and the desktop app.
+
+## Publish to GitHub
+
+Install and sign in to GitHub CLI once:
+
+```powershell
+winget install --id GitHub.cli --exact
+gh auth login
+```
+
+Then publish the public repository and Windows release (replace `YOUR_NAME/YOUR_REPO`):
+
+```powershell
+.\publish_github.ps1 -Repository "YOUR_NAME/YOUR_REPO"
+```
+
+Use `-CreatePrivate` for a private repository. The script pushes the `main` branch and uploads `NetEasePlaylistBackup-v1.0.0-windows.zip` as a GitHub Release asset.
+
+## License
+
+MIT. The project depends on the separately licensed `NeteaseCloudMusicApi` package and ffmpeg. Review their licenses before redistribution.

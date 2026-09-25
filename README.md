@@ -4,14 +4,14 @@ Windows desktop app and Python CLI for backing up NetEase Cloud Music playlists 
 
 ## Features
 
-- Parse a playlist URL or ID through the open-source `NeteaseCloudMusicApi` service.
+- Parse a playlist URL/ID or a single-song URL/ID through the open-source `NeteaseCloudMusicApi` service.
 - QR-code login support; the app sends only the account's own session cookie to the local API.
 - Prefer available MP3 sources, then fall back to lossless sources when exposed by the API.
 - Select the NetEase source quality: standard, higher, exhigh, lossless, Hi-Res, surround, Dolby, or Master when the signed-in API account exposes it.
 - Convert with ffmpeg `libmp3lame`, CBR output from 32 kbps through 320 kbps, 44.1 kHz stereo, ID3v2.3 metadata and album art.
 - Save as `Artist - Title.mp3`, skip existing files, and write `backup.log`.
 
-The project does not bypass DRM, paid access, regional restrictions, or other playback controls. It only backs up content the signed-in account can play. Input is restricted to explicit playlist URLs; single-song URLs and bare song IDs are rejected.
+The project does not bypass DRM, paid access, regional restrictions, or other playback controls. It only backs up content the signed-in account can play. Playlist links and individual song links are supported; bare IDs are accepted when the input type is clear.
 
 ## Quick start on Windows
 

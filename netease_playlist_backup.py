@@ -352,7 +352,7 @@ def main() -> int:
     parser.add_argument("--api", default="http://127.0.0.1:3000")
     parser.add_argument("--level", default="exhigh", choices=tuple(x[0] for x in SOURCE_LEVELS))
     parser.add_argument("--bitrate", default="128k", choices=OUTPUT_BITRATES)
-    parser.add_argument("--ffmpeg", default="ffmpeg")
+    parser.add_argument("--ffmpeg", default=os.environ.get("NETEASE_FFMPEG", "ffmpeg"))
     parser.add_argument("--gui", action="store_true")
     args = parser.parse_args()
     if args.gui:

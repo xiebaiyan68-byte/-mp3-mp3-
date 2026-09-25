@@ -1,5 +1,8 @@
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
+$runtime = Join-Path $PSScriptRoot "runtime"
+if (Test-Path (Join-Path $runtime "ffmpeg.exe")) { $env:Path = "$runtime;$env:Path" }
+$ffmpeg = Join-Path $runtime "ffmpeg.exe"
 $mutex = New-Object System.Threading.Mutex($false, 'NetEasePlaylistBackup.SingleInstance')
 if (-not $mutex.WaitOne(0)) {
   Write-Host "NetEasePlaylistBackup is already starting or running."
@@ -28,4 +31,5 @@ if (-not $api) {
     if (Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue) { break }
   }
 }
+if (Test-Path $ffmpeg) { $env:NETEASE_FFMPEG = $ffmpeg }
 Start-Process -FilePath $appPath -WorkingDirectory $PSScriptRoot
